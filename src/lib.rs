@@ -1,13 +1,14 @@
 extern crate timely;
 
-use timely::dataflow::InputHandle;
 use timely::dataflow::operators::*;
 use timely::dataflow::operators::{Exchange, Input, Inspect, Probe};
+use timely::dataflow::InputHandle;
 
 // This is the simplest example from the documentation, stream numbers through a print data flow.
 fn getting_started() {
     timely::example(|scope| {
-        (0..10).to_stream(scope)
+        (0..10)
+            .to_stream(scope)
             .inspect(|x| println!("seen: {:?}", x));
     });
 }
@@ -18,7 +19,8 @@ fn linear_steps() {
         let index = worker.index();
         let mut input = InputHandle::new();
         let probe = worker.dataflow(|scope| {
-            scope.input_from(&mut input)
+            scope
+                .input_from(&mut input)
                 // exchange has to be used to make sure that the data is shuffled between workers
                 .exchange(|x| *x)
                 .map(|x| x * x)
@@ -33,9 +35,9 @@ fn linear_steps() {
             }
             input.advance_to(round + 1);
         }
-    }).unwrap();
+    })
+    .unwrap();
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -52,5 +54,4 @@ mod tests {
         linear_steps();
         assert_eq!(true, true);
     }
-
 }
