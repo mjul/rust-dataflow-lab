@@ -1,14 +1,25 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+
+extern crate timely;
+
+use timely::dataflow::operators::*;
+
+// This is the simplest example from the documentation, stream numbers through a print data flow.
+fn getting_started() {
+    timely::example(|scope| {
+        (0..10).to_stream(scope)
+            .inspect(|x| println!("seen: {:?}", x));
+    });
 }
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn getting_started_can_run() {
+        getting_started();
+        assert_eq!(true, true);
     }
+
 }
