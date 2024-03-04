@@ -74,13 +74,17 @@ fn split_by_month() {
             scope
                 .input_from(&mut input)
                 .exchange(by_year_month)
-                .inspect(move |(year, month, value): &(u32, u32, u64)| {
-                    let sum = sums_by_year_by_month
-                        .get(&year).unwrap_or(&HashMap::new())
-                        .get(&month).unwrap_or(&0)
-                        .clone();
-                    println!("worker {}:\t {} {} \t obs {} -> {}", index, year, month, value, sum);
-                })
+                .inspect(|x| println!("exchanged:\t datum = {:?}", x))
+                .accumulate((0u32,0u32,0u64),
+                            |sum, data| {
+                                for &(year,month,val) in data.iter() {
+                                    // Note: this only works because all data for a month is in the same epoch
+                                    sum.0 = year;
+                                    sum.1 = month;
+                                    sum.2 += val;
+                                }
+                            })
+                .inspect(move |x| println!("worker {}:\t sum = {:?}", index, x))
                 .probe()
         });
 
@@ -93,6 +97,7 @@ fn split_by_month() {
                     for i in 0..3 {
                         input.send((year, month, (2 * month + i) as u64));
                     }
+                    // advance epoch every month
                     input.advance_to(epoch);
                     epoch += 1;
                 }
