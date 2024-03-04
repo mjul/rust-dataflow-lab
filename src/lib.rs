@@ -5,11 +5,11 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 use timely::communication::Data;
-use timely::dataflow::{InputHandle, Scope};
 use timely::dataflow::operators::*;
 use timely::dataflow::operators::{Exchange, Input, Inspect, Probe};
-use timely::ExchangeData;
+use timely::dataflow::{InputHandle, Scope};
 use timely::progress::Timestamp;
+use timely::ExchangeData;
 
 // This is the simplest example from the documentation, stream numbers through a print data flow.
 fn getting_started() {
@@ -43,7 +43,7 @@ fn linear_steps() {
             input.advance_to(round + 1);
         }
     })
-        .unwrap();
+    .unwrap();
 }
 
 // Stream some measurements through the dataflow, collect sums by month
@@ -52,17 +52,6 @@ fn linear_steps() {
 // Here, we use a tuple (year, month, value) to represent a measurement
 type Measurement = (u32, u32, u64);
 
-
-/*
-                        let count_entry = sums_by_year_by_month
-                            .entry(year.clone())
-                            .or_insert(HashMap::new())
-                            .entry(month.clone())
-                            .or_insert(0u64);
-                        *count_entry += value;
-
- */
-
 fn split_by_month() {
     let config = timely::execute::Config::process(4);
     timely::execute(config, |worker| {
@@ -70,20 +59,20 @@ fn split_by_month() {
         let mut input: timely::dataflow::InputHandle<_, Measurement> = InputHandle::new();
         let probe = worker.dataflow(|scope| {
             let mut sums_by_year_by_month: HashMap<u32, HashMap<u32, u64>> = HashMap::new();
-            let by_year_month = |(year, month, value): &Measurement| (((*year * 100) + *month) as u64);
+            let by_year_month =
+                |(year, month, value): &Measurement| (((*year * 100) + *month) as u64);
             scope
                 .input_from(&mut input)
                 .exchange(by_year_month)
                 .inspect(|x| println!("exchanged:\t datum = {:?}", x))
-                .accumulate((0u32,0u32,0u64),
-                            |sum, data| {
-                                for &(year,month,val) in data.iter() {
-                                    // Note: this only works because all data for a month is in the same epoch
-                                    sum.0 = year;
-                                    sum.1 = month;
-                                    sum.2 += val;
-                                }
-                            })
+                .accumulate((0u32, 0u32, 0u64), |sum, data| {
+                    for &(year, month, val) in data.iter() {
+                        // Note: this only works because all data for a month is in the same epoch
+                        sum.0 = year;
+                        sum.1 = month;
+                        sum.2 += val;
+                    }
+                })
                 .inspect(move |x| println!("worker {}:\t sum = {:?}", index, x))
                 .probe()
         });
@@ -104,7 +93,7 @@ fn split_by_month() {
             }
         }
     })
-        .unwrap();
+    .unwrap();
 }
 
 #[cfg(test)]
