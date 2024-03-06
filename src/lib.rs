@@ -1,10 +1,10 @@
 extern crate timely;
 
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::Hash;
 
 use timely::communication::Data;
+use timely::dataflow::operators::capture::Extract;
 use timely::dataflow::operators::*;
 use timely::dataflow::operators::{Exchange, Input, Inspect, Probe};
 use timely::dataflow::{InputHandle, Scope};
@@ -52,13 +52,13 @@ fn linear_steps() {
 // Here, we use a tuple (year, month, value) to represent a measurement
 type Measurement = (u32, u32, u64);
 
-fn split_by_month() {
+// This uses the `accumulate` operator to sum up the measurements for each epoch (month)
+fn accumulate_by_epoch() {
     let config = timely::execute::Config::process(4);
     timely::execute(config, |worker| {
         let index = worker.index();
         let mut input: timely::dataflow::InputHandle<_, Measurement> = InputHandle::new();
-        let probe = worker.dataflow(|scope| {
-            let mut sums_by_year_by_month: HashMap<u32, HashMap<u32, u64>> = HashMap::new();
+        worker.dataflow(|scope| {
             let by_year_month =
                 |(year, month, value): &Measurement| (((*year * 100) + *month) as u64);
             scope
@@ -103,18 +103,15 @@ mod tests {
     #[test]
     fn getting_started_can_run() {
         getting_started();
-        assert_eq!(true, true);
     }
 
     #[test]
     fn linear_steps_can_run() {
         linear_steps();
-        assert_eq!(true, true);
     }
 
     #[test]
-    fn split_by_month_can_run() {
-        split_by_month();
-        assert_eq!(true, true);
+    fn accumulate_by_epoch_can_run() {
+        accumulate_by_epoch();
     }
 }
