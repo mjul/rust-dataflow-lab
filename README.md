@@ -1,13 +1,16 @@
 # rust-dataflow-lab
 
-Trying out the Timely Dataflow library
+Trying out the Timely Dataflow library.
 
 ## Timely Dataflow Cheat Sheet
+
+Dataflow operators are operations on streams of data. 
+You can read about the dataflow operators here: https://timelydataflow.github.io/timely-dataflow/chapter_2/chapter_2_3.html
 
 Some notes:
 
 `exchange` is used to distribute data to workers according to a hash function. It is useful for sharding to ensure that
-all data with the same key goes to the same worker.
+all data with the same key goes to the same worker. Also known as "physical" partitioning.
 
 `inspect` is used to look at data in the stream.
 
