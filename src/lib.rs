@@ -96,6 +96,40 @@ fn accumulate_by_epoch() {
     .unwrap();
 }
 
+fn capture_result_stream() -> Vec<i32> {
+    let config = timely::execute::Config::process(4);
+    let result = timely::execute(config, |worker| {
+        let (mut input, result) = worker.dataflow(|scope| {
+            let (input, stream) = scope.new_input();
+            let result = stream
+                .map(|x| 10 * x)
+                .inspect(|x| println!("value: {:?}", x))
+                .capture();
+            (input, result)
+        });
+        let index = worker.index();
+
+        // Only worker 0 sends data
+        if index == 0 {
+            for round in 0..10 {
+                input.send(round);
+                input.advance_to(round + 1);
+            }
+        }
+
+        result
+    })
+    .unwrap();
+    let collected: Vec<_> = result
+        .join()
+        .into_iter()
+        .map(|x| x.unwrap().extract())
+        .flat_map(|x| x.into_iter().map(|x| x.1))
+        .flatten()
+        .collect();
+    collected
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,5 +147,11 @@ mod tests {
     #[test]
     fn accumulate_by_epoch_can_run() {
         accumulate_by_epoch();
+    }
+
+    #[test]
+    fn capture_result_stream_can_run() {
+        let rs = capture_result_stream();
+        assert_eq!(vec![0, 10, 20, 30, 40, 50, 60, 70, 80, 90], rs);
     }
 }
