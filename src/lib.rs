@@ -1,15 +1,17 @@
 extern crate timely;
 
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::hash::Hash;
 
 use timely::communication::Data;
-use timely::dataflow::operators::capture::Extract;
+use timely::dataflow::{InputHandle, Scope};
 use timely::dataflow::operators::*;
 use timely::dataflow::operators::{Exchange, Input, Inspect, Probe};
-use timely::dataflow::{InputHandle, Scope};
-use timely::progress::Timestamp;
+use timely::dataflow::operators::aggregation::Aggregate;
+use timely::dataflow::operators::capture::Extract;
 use timely::ExchangeData;
+use timely::progress::Timestamp;
 
 // This is the simplest example from the documentation, stream numbers through a print data flow.
 fn getting_started() {
@@ -43,7 +45,7 @@ fn linear_steps() {
             input.advance_to(round + 1);
         }
     })
-    .unwrap();
+        .unwrap();
 }
 
 // Stream some measurements through the dataflow, collect sums by month
@@ -93,7 +95,7 @@ fn accumulate_by_epoch() {
             }
         }
     })
-    .unwrap();
+        .unwrap();
 }
 
 fn capture_result_stream() -> Vec<i32> {
@@ -119,7 +121,7 @@ fn capture_result_stream() -> Vec<i32> {
 
         result
     })
-    .unwrap();
+        .unwrap();
     let collected: Vec<_> = result
         .join()
         .into_iter()
@@ -129,6 +131,58 @@ fn capture_result_stream() -> Vec<i32> {
         .collect();
     collected
 }
+
+
+// Track logins and compute number of daily active users (DAU) and monthly active users (MAU).
+// To keep it simple we assume an input stream with user ids and date of login, date as (year,month,day).
+type UserId = u32;
+type LoginDate = (u32, u32, u32);
+type UserLoggedIn = (UserId, LoginDate);
+
+fn dau_mau_network() {
+    let config = timely::execute::Config::process(4);
+    timely::execute(config, |worker| {
+        let index = worker.index();
+        let mut input_events: InputHandle<_, UserLoggedIn> = InputHandle::new();
+        println!("worker {} executing...\n", index);
+
+        worker.dataflow(|scope| {
+            let by_year_month_day =
+                |(uid, (year, month, day)): &UserLoggedIn| (((*year * 10000) + *month * 100 + *day) as u64);
+            scope
+                .input_from(&mut input_events)
+                .map(|(uid, date)| (date, uid))
+                .inspect(|x| println!("(K,V) stream:\t datum = {:?}", x))
+                .aggregate::<_, HashSet<UserId>, _, _, _>(
+                    |key, val, agg| {
+                        agg.insert(val);
+                    },
+                    |key, agg| (key, agg),
+                    |(year, month, day)| (((*year * 10000) + *month * 100 + *day) as u64),
+                )
+                .inspect(|x| println!("aggregated daily users:\t datum = {:?}", x))
+                // TODO: count DAUs, aggregate and count MAUs
+                .probe()
+        });
+
+
+        // Only worker 0 sends data
+        if index == 0 {
+            let mut epoch = 0;
+            for month in 1..=3 {
+                for day in 1..=5 {
+                    for user_id in 1..=3 {
+                        input_events.send((user_id, (2024, month, day)));
+                    }
+                    // advance epoch every day
+                    input_events.advance_to(epoch);
+                    epoch += 1;
+                }
+            }
+        }
+    }).unwrap();
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -153,5 +207,10 @@ mod tests {
     fn capture_result_stream_can_run() {
         let rs = capture_result_stream();
         assert_eq!(vec![0, 10, 20, 30, 40, 50, 60, 70, 80, 90], rs);
+    }
+
+    #[test]
+    fn dau_mau_network_can_run() {
+        let rs = dau_mau_network();
     }
 }
